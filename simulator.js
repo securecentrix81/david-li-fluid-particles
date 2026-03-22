@@ -353,27 +353,29 @@ var Simulator = (function () {
     };
 
     Simulator.prototype._handleDeviceMotion = function (event) {
-        if (!event || !event.accelerationIncludingGravity) return;
+    // Ensure we are using accelerationIncludingGravity
+    if (!event || !event.accelerationIncludingGravity) return;
 
-        var ax = Number(event.accelerationIncludingGravity.x);
-        var ay = Number(event.accelerationIncludingGravity.y);
-        var az = Number(event.accelerationIncludingGravity.z);
+    var ax = Number(event.accelerationIncludingGravity.x);
+    var ay = Number(event.accelerationIncludingGravity.y);
+    var az = Number(event.accelerationIncludingGravity.z);
 
-        if (!isFinite(ax) || !isFinite(ay) || !isFinite(az)) return;
+    if (!isFinite(ax) || !isFinite(ay) || !isFinite(az)) return;
 
-        if (this.filteredDeviceGravity === null) {
-            this.filteredDeviceGravity = [ax, ay, az];
-        } else {
-            var keep = this.deviceMotionFilterStrength;
-            var blend = 1.0 - keep;
+    // Apply low-pass filter to smooth out sensor noise
+    if (this.filteredDeviceGravity === null) {
+        this.filteredDeviceGravity = [ax, ay, az];
+    } else {
+        var keep = this.deviceMotionFilterStrength; // e.g., 0.85
+        var blend = 1.0 - keep;
 
-            this.filteredDeviceGravity[0] = this.filteredDeviceGravity[0] * keep + ax * blend;
-            this.filteredDeviceGravity[1] = this.filteredDeviceGravity[1] * keep + ay * blend;
-            this.filteredDeviceGravity[2] = this.filteredDeviceGravity[2] * keep + az * blend;
-        }
+        this.filteredDeviceGravity[0] = this.filteredDeviceGravity[0] * keep + ax * blend;
+        this.filteredDeviceGravity[1] = this.filteredDeviceGravity[1] * keep + ay * blend;
+        this.filteredDeviceGravity[2] = this.filteredDeviceGravity[2] * keep + az * blend;
+    }
 
-        this.deviceGravityTimestamp = getNow();
-    };
+    this.deviceGravityTimestamp = getNow();
+};
 
     Simulator.prototype._deviceGravityToCameraSpace = function (deviceGravity) {
         var rotatedXY = rotateDeviceXYToScreenXY(
@@ -407,46 +409,38 @@ var Simulator = (function () {
     };
 
     Simulator.prototype._computeTargetGravity = function () {
-        var targetGravity = this.defaultGravity.slice(0);
+    var defaultForce = this.defaultGravity.slice(0); // Usually [0, -40, 0]
 
-        if (!this.useAccelerometerGravity) {
-            return targetGravity;
-        }
+    // Fallback if accelerometer is off or unavailable
+    if (!this.useAccelerometerGravity || !this.deviceMotionListening || this.filteredDeviceGravity === null) {
+        return defaultForce;
+    }
 
-        if (!this.deviceMotionListening || this.filteredDeviceGravity === null) {
-            return targetGravity;
-        }
+    // Fallback if the sensor hasn't updated in a while (preventing "stuck" gravity)
+    if ((getNow() - this.deviceGravityTimestamp) > this.deviceGravityMaxAge) {
+        return defaultForce;
+    }
 
-        if ((getNow() - this.deviceGravityTimestamp) > this.deviceGravityMaxAge) {
-            return targetGravity;
-        }
+    // 1. Transform the raw device data into Camera/Screen space
+    var cameraGravity = this._deviceGravityToCameraSpace(this.filteredDeviceGravity);
 
-        if (!this.hasViewMatrix) {
-            return targetGravity;
-        }
+    // 2. SCALE THE FORCE
+    // Earth's gravity is ~9.81. Your simulator's gravity is ~40.0.
+    // We create a multiplier so that holding the phone still results in 40.0 force units,
+    // but shaking the phone (which might hit 20 or 30 m/s^2) results in 80.0 or 120.0 units.
+    var earthGravityConstant = 9.80665;
+    var simulatorScale = vec3Length(this.defaultGravity) / earthGravityConstant;
 
-        var cameraGravity = this._deviceGravityToCameraSpace(this.filteredDeviceGravity);
-        var cameraMagnitude = vec3Length(cameraGravity);
+    cameraGravity[0] *= simulatorScale;
+    cameraGravity[1] *= simulatorScale;
+    cameraGravity[2] *= simulatorScale;
 
-        if (cameraMagnitude < 0.0001) {
-            return targetGravity;
-        }
+    // 3. Transform from Camera space to World space
+    var worldGravity = this._cameraVectorToWorldVector(cameraGravity);
 
-        var targetMagnitude = vec3Length(this.defaultGravity);
+    return worldGravity || defaultForce;
+};
 
-        if (targetMagnitude <= 0.0) {
-            return [0.0, 0.0, 0.0];
-        }
-
-        cameraGravity = [
-            cameraGravity[0] * targetMagnitude / cameraMagnitude,
-            cameraGravity[1] * targetMagnitude / cameraMagnitude,
-            cameraGravity[2] * targetMagnitude / cameraMagnitude
-        ];
-
-        var worldGravity = this._cameraVectorToWorldVector(cameraGravity);
-        return worldGravity || targetGravity;
-    };
 
     Simulator.prototype._updateCurrentGravity = function (timeStep) {
         var targetGravity = this._computeTargetGravity();
