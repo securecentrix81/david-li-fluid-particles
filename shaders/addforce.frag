@@ -5,6 +5,7 @@ varying vec2 v_coordinates;
 uniform sampler2D u_velocityTexture;
 
 uniform vec3 u_mouseVelocity;
+uniform vec3 u_gravity;
 
 uniform vec3 u_gridResolution;
 uniform vec3 u_gridSize;
@@ -26,7 +27,7 @@ float kernel (vec3 position, float radius) {
 void main () {
     vec3 velocity = texture2D(u_velocityTexture, v_coordinates).rgb;
 
-    vec3 newVelocity = velocity + vec3(0.0, -40.0 * u_timeStep, 0.0); //add gravity
+    vec3 newVelocity = velocity + u_gravity * u_timeStep;
 
     vec3 cellIndex = floor(get3DFragCoord(u_gridResolution + 1.0));
     vec3 xPosition = vec3(cellIndex.x, cellIndex.y + 0.5, cellIndex.z + 0.5);
@@ -38,5 +39,5 @@ void main () {
 
     newVelocity += u_mouseVelocity * kernelValues * 3.0 * smoothstep(0.0, 1.0 / 200.0, u_timeStep);
 
-    gl_FragColor = vec4(newVelocity * 1.0, 0.0);
+    gl_FragColor = vec4(newVelocity, 0.0);
 }
