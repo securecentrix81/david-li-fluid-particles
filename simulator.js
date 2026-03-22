@@ -352,30 +352,31 @@ var Simulator = (function () {
         this.hasViewMatrix = true;
     };
 
-    Simulator.prototype._handleDeviceMotion = function (event) {
-    // Ensure we are using accelerationIncludingGravity
-    if (!event || !event.accelerationIncludingGravity) return;
+        Simulator.prototype._handleDeviceMotion = function (event) {
+        // Ensure we are using accelerationIncludingGravity
+        if (!event || !event.accelerationIncludingGravity) return;
 
-    var ax = Number(event.accelerationIncludingGravity.x);
-    var ay = Number(event.accelerationIncludingGravity.y);
-    var az = Number(event.accelerationIncludingGravity.z);
+        var ax = Number(event.accelerationIncludingGravity.x);
+        var ay = Number(event.accelerationIncludingGravity.y);
+        var az = Number(event.accelerationIncludingGravity.z);
 
-    if (!isFinite(ax) || !isFinite(ay) || !isFinite(az)) return;
+        if (!isFinite(ax) || !isFinite(ay) || !isFinite(az)) return;
 
-    // Apply low-pass filter to smooth out sensor noise
-    if (this.filteredDeviceGravity === null) {
-        this.filteredDeviceGravity = [ax, ay, az];
-    } else {
-        var keep = this.deviceMotionFilterStrength; // e.g., 0.85
-        var blend = 1.0 - keep;
+        // Initialize if this is the first event
+        if (this.filteredDeviceGravity === null) {
+            this.filteredDeviceGravity = [0, 0, 0];
+        }
 
-        this.filteredDeviceGravity[0] = this.filteredDeviceGravity[0] * keep + ax * blend;
-        this.filteredDeviceGravity[1] = this.filteredDeviceGravity[1] * keep + ay * blend;
-        this.filteredDeviceGravity[2] = this.filteredDeviceGravity[2] * keep + az * blend;
-    }
+        // Apply requested formula: gravity = acceleration * multiplier + gravity
+        // We use deviceMotionFilterStrength as the multiplier
+        var multiplier = this.deviceMotionFilterStrength;
 
-    this.deviceGravityTimestamp = getNow();
-};
+        this.filteredDeviceGravity[0] = ax * multiplier + this.filteredDeviceGravity[0];
+        this.filteredDeviceGravity[1] = ay * multiplier + this.filteredDeviceGravity[1];
+        this.filteredDeviceGravity[2] = az * multiplier + this.filteredDeviceGravity[2];
+
+        this.deviceGravityTimestamp = getNow();
+    };
 
     Simulator.prototype._deviceGravityToCameraSpace = function (deviceGravity) {
         var rotatedXY = rotateDeviceXYToScreenXY(
