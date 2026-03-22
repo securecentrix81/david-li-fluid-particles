@@ -1,5 +1,5 @@
 //'use strict';
-
+ 
 var Simulator = (function () {
 
     function swap(object, a, b) {
