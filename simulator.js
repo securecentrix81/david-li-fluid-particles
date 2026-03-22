@@ -123,6 +123,7 @@ var Simulator = (function () {
         this.deviceGravityTimestamp = 0;
         this.deviceGravityMaxAge = 500; // ms
         this.deviceMotionFilterStrength = 1;
+     this.vardebug1 =1/9
 
         this.viewMatrix = identityMatrix4();
         this.hasViewMatrix = false;
@@ -373,9 +374,9 @@ var Simulator = (function () {
     // Formula: (accelnograv * mul) + gravnoaccel
     // Note: gravnoaccel is (IncludingGravity - LinearAcceleration)
     this.filteredDeviceGravity = [
-        (ax * mul) + (gx - ax),
-        (ay * mul) + (gy - ay),
-        (az * mul) + (gz - az)
+        (ax * mul) + (gx - ax)*this.vardebug1,
+        (ay * mul) + (gy - ay)*this.vardebug1,
+        (az * mul) + (gz - az)*this.vardebug1
     ];
 
     this.deviceGravityTimestamp = getNow();
