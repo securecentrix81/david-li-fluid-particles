@@ -122,7 +122,7 @@ var Simulator = (function () {
         this.filteredDeviceGravity = null;
         this.deviceGravityTimestamp = 0;
         this.deviceGravityMaxAge = 500; // ms
-        this.deviceMotionFilterStrength = 5.85;
+        this.deviceMotionFilterStrength = 2;
 
         this.viewMatrix = identityMatrix4();
         this.hasViewMatrix = false;
