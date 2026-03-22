@@ -85,40 +85,177 @@
         <script src="simulatorrenderer.js"></script>
         <script src="slider.js"></script>
         <script src="fluidparticles.js"></script>
-
-        <script>
-            function concatenateWords (list) {
-                if (list.length === 0) {
-                    return '';
-                } else if (list.length === 1) {
-                    return "'" + list[0] + "'";
-                } else {
-                    var result = '';
-                    for (var i = 0; i < list.length; ++i) {
-                        result += "'" + list[i] + "'";
-                        if (i < list.length - 1) {
-                            result += i < list.length - 2 ? ', ' : ' and '
-                        }
-                    }
-
-                    return result;
+<script>
+    function concatenateWords(list) {
+        if (list.length === 0) {
+            return '';
+        } else if (list.length === 1) {
+            return "'" + list[0] + "'";
+        } else {
+            var result = '';
+            for (var i = 0; i < list.length; ++i) {
+                result += "'" + list[i] + "'";
+                if (i < list.length - 1) {
+                    result += i < list.length - 2 ? ', ' : ' and ';
                 }
             }
+            return result;
+        }
+    }
 
-            WrappedGL.checkWebGLSupportWithExtensions(['ANGLE_instanced_arrays', 'WEBGL_depth_texture', 'OES_texture_float', 'OES_texture_float_linear', 'OES_texture_half_float', 'OES_texture_half_float_linear'],
-                function () { //we have webgl
-                    document.getElementById('placeholder').outerHTML = document.getElementById('main').innerHTML;
-                    var fluidBox = new FluidParticles();
-                }, function (hasWebGL, unsupportedExtensions) {
-                    document.getElementById('placeholder').outerHTML = document.getElementById('no-support').innerHTML;
-                    if (!hasWebGL) { //webgl not supported
-                        document.getElementById('error').textContent = 'Unfortunately, your browser does not support WebGL';
-                    } else {
-                        document.getElementById('error').textContent = 'Unfortunately, your browser does not support the ' + concatenateWords(unsupportedExtensions) + " WebGL extension" + (unsupportedExtensions.length > 1 ? 's.' : '.');
-                    }
-                }
+    function installErrorOverlay() {
+        var errorBox = document.createElement('div');
+        errorBox.id = 'mobile-error-overlay';
+        errorBox.style.position = 'fixed';
+        errorBox.style.left = '0';
+        errorBox.style.right = '0';
+        errorBox.style.bottom = '0';
+        errorBox.style.maxHeight = '45vh';
+        errorBox.style.overflow = 'auto';
+        errorBox.style.background = 'rgba(120,0,0,0.92)';
+        errorBox.style.color = '#fff';
+        errorBox.style.fontFamily = 'monospace';
+        errorBox.style.fontSize = '12px';
+        errorBox.style.lineHeight = '1.4';
+        errorBox.style.padding = '10px';
+        errorBox.style.zIndex = '999999';
+        errorBox.style.whiteSpace = 'pre-wrap';
+        errorBox.style.display = 'none';
+        document.body.appendChild(errorBox);
+
+        function showError(message) {
+            errorBox.style.display = 'block';
+            errorBox.textContent += message + '\n';
+        }
+
+        window.addEventListener('error', function (event) {
+            showError(
+                '[error] ' +
+                (event.message || 'Unknown error') +
+                (event.filename ? '\n' + event.filename + ':' + event.lineno + ':' + event.colno : '')
             );
-        </script>
+        });
+
+        window.addEventListener('unhandledrejection', function (event) {
+            var reason = event.reason;
+            showError('[promise] ' + (reason && reason.stack ? reason.stack : String(reason)));
+        });
+
+        return showError;
+    }
+
+    function createBootOverlay(onStart) {
+        var overlay = document.createElement('div');
+        overlay.id = 'boot-overlay';
+        overlay.style.position = 'fixed';
+        overlay.style.left = '0';
+        overlay.style.top = '0';
+        overlay.style.width = '100vw';
+        overlay.style.height = '100vh';
+        overlay.style.background = '#111';
+        overlay.style.color = '#fff';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.flexDirection = 'column';
+        overlay.style.zIndex = '999998';
+        overlay.style.fontFamily = 'Asap, sans-serif';
+        overlay.style.textAlign = 'center';
+
+        var button = document.createElement('div');
+        button.textContent = 'Tap to Start';
+        button.style.padding = '18px 28px';
+        button.style.border = '2px solid #fff';
+        button.style.borderRadius = '8px';
+        button.style.fontSize = '24px';
+        button.style.cursor = 'pointer';
+        button.style.userSelect = 'none';
+
+        var subtitle = document.createElement('div');
+        subtitle.textContent = 'This may request motion permission on iPhone/iPad.';
+        subtitle.style.marginTop = '16px';
+        subtitle.style.fontSize = '14px';
+        subtitle.style.opacity = '0.8';
+
+        overlay.appendChild(button);
+        overlay.appendChild(subtitle);
+        document.body.appendChild(overlay);
+
+        function start() {
+            button.textContent = 'Starting...';
+            button.style.pointerEvents = 'none';
+            Promise.resolve(onStart()).then(function () {
+                if (overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
+            }).catch(function (error) {
+                button.textContent = 'Tap to Start';
+                button.style.pointerEvents = 'auto';
+                throw error;
+            });
+        }
+
+        overlay.addEventListener('click', start);
+        overlay.addEventListener('touchend', function (e) {
+            e.preventDefault();
+            start();
+        }, { passive: false });
+    }
+
+    var showError = installErrorOverlay();
+
+    WrappedGL.checkWebGLSupportWithExtensions(
+        [
+            'ANGLE_instanced_arrays',
+            'WEBGL_depth_texture',
+            'OES_texture_float',
+            'OES_texture_float_linear',
+            'OES_texture_half_float',
+            'OES_texture_half_float_linear'
+        ],
+        function () {
+            createBootOverlay(function () {
+                var requestMotionPermission = Promise.resolve();
+
+                if (
+                    window.DeviceMotionEvent &&
+                    typeof window.DeviceMotionEvent.requestPermission === 'function'
+                ) {
+                    requestMotionPermission = window.DeviceMotionEvent.requestPermission()
+                        .then(function (state) {
+                            // not fatal if denied; simulator should fall back
+                            return state;
+                        })
+                        .catch(function (error) {
+                            showError('Device motion permission request failed: ' + error);
+                        });
+                }
+
+                return requestMotionPermission.then(function () {
+                    document.getElementById('placeholder').outerHTML =
+                        document.getElementById('main').innerHTML;
+
+                    window.fluidBox = new FluidParticles();
+                });
+            });
+        },
+        function (hasWebGL, unsupportedExtensions) {
+            document.getElementById('placeholder').outerHTML =
+                document.getElementById('no-support').innerHTML;
+
+            if (!hasWebGL) {
+                document.getElementById('error').textContent =
+                    'Unfortunately, your browser does not support WebGL';
+            } else {
+                document.getElementById('error').textContent =
+                    'Unfortunately, your browser does not support the ' +
+                    concatenateWords(unsupportedExtensions) +
+                    ' WebGL extension' +
+                    (unsupportedExtensions.length > 1 ? 's.' : '.');
+            }
+        }
+    );
+</script>
     </body>
 
 </html>
