@@ -1,4 +1,4 @@
-'use strict';
+//'use strict';
 
 var Renderer = (function () {
 
@@ -114,12 +114,12 @@ var Renderer = (function () {
             packedNormals = [],
             indices = [];
 
-        for (i = 0; i < vertices.length; ++i) {
+        for (let i = 0; i < vertices.length; ++i) {
             packedVertices.push(vertices[i][0], vertices[i][1], vertices[i][2]);
             packedNormals.push(normals[i][0], normals[i][1], normals[i][2]);
         }
 
-        for (i = 0; i < faces.length; ++i) {
+        for (let i = 0; i < faces.length; ++i) {
             var face = faces[i];
             indices.push(face[0], face[1], face[2]);
         }
